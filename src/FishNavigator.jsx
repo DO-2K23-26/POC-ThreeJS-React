@@ -28,6 +28,11 @@ function FishNavigator(props) {
 
       // Set the target position for the fish to move towards
       setTargetPosition(intersectPoint)
+      ref.current.lookAt(
+        intersectPoint.x,
+        intersectPoint.y,
+        intersectPoint.z
+      )
     }
 
     gl.domElement.addEventListener('click', handleClick)
@@ -39,7 +44,7 @@ function FishNavigator(props) {
 
   React.useEffect(() => {
     if (actions) {
-      const action = actions['swim'] // Replace 'swim' with the actual name of the animation
+      const action = actions['swim'] 
       action.reset().fadeIn(0.5).play()
       action.setLoop(THREE.LoopRepeat)
     }
@@ -63,3 +68,4 @@ function FishNavigator(props) {
 }
 
 export default FishNavigator
+
