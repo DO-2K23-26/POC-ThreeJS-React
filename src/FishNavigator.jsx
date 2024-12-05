@@ -12,28 +12,22 @@ function FishNavigator(props) {
 
   const { camera, gl } = useThree()
 
-  // Add click event listener to set the target position when clicked
   React.useEffect(() => {
     const handleClick = (event) => {
-      // Get mouse position in normalized device coordinates (-1 to +1)
-      const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1)
+      const mouse = new THREE.Vector2(
+        (event.clientX / window.innerWidth) * 2 - 1,
+        -(event.clientY / window.innerHeight) * 2 + 1
+      )
 
-      // Create a raycaster to find the 3D point on the plane
       const raycaster = new THREE.Raycaster()
       raycaster.setFromCamera(mouse, camera)
 
-      // Define a ground plane where the fish can move (e.g., y = 0)
       const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0) // y = 0 plane
       const intersectPoint = new THREE.Vector3()
       raycaster.ray.intersectPlane(plane, intersectPoint)
 
-      // Set the target position for the fish to move towards
       setTargetPosition(intersectPoint)
-      ref.current.lookAt(
-        intersectPoint.x,
-        intersectPoint.y,
-        intersectPoint.z
-      )
+      ref.current.lookAt(intersectPoint.x, intersectPoint.y, intersectPoint.z)
     }
 
     gl.domElement.addEventListener('click', handleClick)
@@ -43,60 +37,63 @@ function FishNavigator(props) {
     }
   }, [camera, gl])
 
-  React.useEffect(() => {
-    if (actions) {
-      // Start with the "idle" action
-      const idleAction = actions['idle'] // Replace 'idle' with the exact name of your idle animation
-      if (idleAction) {
-        idleAction.reset().fadeIn(0.5).play()
-        idleAction.setLoop(THREE.LoopRepeat)
-      }
+  const playLastPartOfSwim = () => {
+    const swimAction = actions['swim']
+    if (swimAction) {
+      const totalDuration = swimAction.getClip().duration
+      const startTime = totalDuration - 1.36 // Start time for the last 1.36 seconds
+      const segmentDuration = 1.36 // Duration of the loop segment
+  
+      swimAction.reset()
+      swimAction.setLoop(THREE.LoopRepeat) // Set to repeat the segment
+      swimAction.clampWhenFinished = false
+      swimAction.timeScale = 1 // Normal speed
+  
+      // Set up time restrictions for the loop
+      swimAction.time = startTime // Start at the last 1.36 seconds
+      swimAction.play()
+  
+      // Update mixer to restrict the animation's playback within the desired range
+      const mixer = swimAction.getMixer()
+      mixer.addEventListener('loop', (e) => {
+        if (e.action === swimAction) {
+          swimAction.time = startTime // Reset time to keep looping the segment
+        }
+      })
     }
-  }, [actions])
+  }
+  
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     if (!ref.current) return
-
+  
     const currentPosition = ref.current.position
     const direction = new THREE.Vector3().subVectors(targetPosition, currentPosition)
     const distance = direction.length()
-    const moveDistance = Math.min(distance, delta * 1) // Adjust the speed here
-
-    if (distance > 0) {
-      // Switch to "swim" animation if moving
-      if (!isMoving && actions) {
-        const swimAction = actions['swim'] // Replace 'swim' with the exact name of your swim animation
-        if (swimAction) {
-          swimAction.reset().fadeIn(0.5).play()
-          swimAction.setLoop(THREE.LoopRepeat)
-        }
-
-        const idleAction = actions['idle'] // Replace 'idle' with the exact name of your idle animation
-        if (idleAction) idleAction.fadeOut(0.5)
+    const moveDistance = Math.min(distance, delta * 1) // Adjust speed
+  
+    if (distance > 0.1) {
+      if (!isMoving) {
+        playLastPartOfSwim() // Play and loop the last 1.36 seconds of the swim animation
+        setIsMoving(true)
       }
-
-      setIsMoving(true)
+  
       direction.normalize()
       currentPosition.addScaledVector(direction, moveDistance)
-    } else if (isMoving) {
-      // Switch to "idle" animation if stopped
-      if (actions) {
-        const idleAction = actions['idle'] // Replace 'idle' with the exact name of your idle animation
-        if (idleAction) {
-          idleAction.reset().fadeIn(0.5).play()
-          idleAction.setLoop(THREE.LoopRepeat)
-        }
-
-        const swimAction = actions['swim'] // Replace 'swim' with the exact name of your swim animation
-        if (swimAction) swimAction.fadeOut(0.5)
+    } else {
+      if (isMoving) {
+        const swimAction = actions['swim']
+        const mixer = swimAction?.getMixer()
+        mixer?.removeEventListener('loop') // Clean up to prevent stacking
+        swimAction?.stop()
+        actions['idle']?.reset().play()
+        setIsMoving(false)
       }
-
-      setIsMoving(false)
     }
   })
+  
 
   return <primitive ref={ref} object={scene} {...props} />
 }
 
 export default FishNavigator
-
