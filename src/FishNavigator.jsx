@@ -8,6 +8,7 @@ function FishNavigator(props) {
   const { scene, animations } = useGLTF('/fish.glb')
   const { actions } = useAnimations(animations, ref)
   const [targetPosition, setTargetPosition] = React.useState(new THREE.Vector3())
+  const [isMoving, setIsMoving] = React.useState(false)
 
   const { camera, gl } = useThree()
 
@@ -44,9 +45,12 @@ function FishNavigator(props) {
 
   React.useEffect(() => {
     if (actions) {
-      const action = actions['swim'] 
-      action.reset().fadeIn(0.5).play()
-      action.setLoop(THREE.LoopRepeat)
+      // Start with the "idle" action
+      const idleAction = actions['idle'] // Replace 'idle' with the exact name of your idle animation
+      if (idleAction) {
+        idleAction.reset().fadeIn(0.5).play()
+        idleAction.setLoop(THREE.LoopRepeat)
+      }
     }
   }, [actions])
 
@@ -59,8 +63,35 @@ function FishNavigator(props) {
     const moveDistance = Math.min(distance, delta * 1) // Adjust the speed here
 
     if (distance > 0) {
+      // Switch to "swim" animation if moving
+      if (!isMoving && actions) {
+        const swimAction = actions['swim'] // Replace 'swim' with the exact name of your swim animation
+        if (swimAction) {
+          swimAction.reset().fadeIn(0.5).play()
+          swimAction.setLoop(THREE.LoopRepeat)
+        }
+
+        const idleAction = actions['idle'] // Replace 'idle' with the exact name of your idle animation
+        if (idleAction) idleAction.fadeOut(0.5)
+      }
+
+      setIsMoving(true)
       direction.normalize()
       currentPosition.addScaledVector(direction, moveDistance)
+    } else if (isMoving) {
+      // Switch to "idle" animation if stopped
+      if (actions) {
+        const idleAction = actions['idle'] // Replace 'idle' with the exact name of your idle animation
+        if (idleAction) {
+          idleAction.reset().fadeIn(0.5).play()
+          idleAction.setLoop(THREE.LoopRepeat)
+        }
+
+        const swimAction = actions['swim'] // Replace 'swim' with the exact name of your swim animation
+        if (swimAction) swimAction.fadeOut(0.5)
+      }
+
+      setIsMoving(false)
     }
   })
 
